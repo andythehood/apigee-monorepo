@@ -36,6 +36,7 @@ jobs:
         id: detect
         run: |
           echo "Detecting changed Apigee proxies..."
+          echo "Event name: ${{ github.event_name }}"
 
           # Compare with the base commit (for PRs) or previous SHA (for push)
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
