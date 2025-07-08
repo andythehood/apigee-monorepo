@@ -25,6 +25,7 @@ jobs:
   detect-changed-proxies:
     name: Detect Changed Proxies
     runs-on: ubuntu-latest
+    environment: dev
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
