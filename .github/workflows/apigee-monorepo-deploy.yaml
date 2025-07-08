@@ -111,8 +111,7 @@ jobs:
 
       - name: Run apigeelint
         run: |
-          # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the
-          # number of warnings is exceeded
+          # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the number of warnings is exceeded
           apigeelint -s ./proxies/${{ matrix.proxy }}/apiproxy -f stylish --maxWarnings 10
 
       - name: Output Deployment Info
