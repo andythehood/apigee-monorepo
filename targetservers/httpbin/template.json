@@ -4,7 +4,7 @@
   "port": ${PORT},
   "isEnabled": true,
   "sSLInfo": {
-    "enabled": "${SSL}",
+    "enabled": ${SSL},
     "commonName": {},
     "enforce": true
   },
