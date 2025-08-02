@@ -23,15 +23,18 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-env:
-  APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-  APIGEE_X_ENVS: "public private"
+# env:
+#   APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+#   APIGEE_X_ENVS: "public private"
 
 jobs:
   detect-changes:
     name: Detect Changes to Target Servers and KVMs
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+      APIGEE_X_ENVS: "public private"
     outputs:
       changed_targetservers: ${{ steps.set-targetservers.outputs.matrix }}
       changed_kvms: ${{ steps.set-kvms.outputs.matrix }}
@@ -66,7 +69,9 @@ jobs:
           FILES="${{ steps.changed.outputs.changed_files }}"
 
           KVMS=$(echo "$FILES" | tr ' ' '\n' | grep '^kvms/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-          echo "matrix=$KVMS" >> $GITHUB_OUTPUT
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$KVMS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract changed Target Server folders
         id: set-targetservers
@@ -74,7 +79,9 @@ jobs:
           FILES="${{ steps.changed.outputs.changed_files }}"
 
           TARGETSERVERS=$(echo "$FILES" | tr ' ' '\n' | grep '^targetservers/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-          echo "matrix=$TARGETSERVERS" >> $GITHUB_OUTPUT
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$TARGETSERVERS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
   deploy-targetservers:
     name: Deploy Changed Target Servers
@@ -88,6 +95,18 @@ jobs:
       matrix:
         name: ${{ fromJson(needs.detect-changes.outputs.changed_targetservers) }}
     steps:
+      - name: Select branch for environment
+        id: select_branch
+        run: |
+          echo "branch=main" >> $GITHUB_OUTPUT
+          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+          #   echo "branch=main" >> $GITHUB_OUTPUT
+          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
+          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
+          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
+          # fi
+
       - name: Checkout repo
         uses: actions/checkout@v4
 
@@ -149,6 +168,19 @@ jobs:
       matrix:
         name: ${{ fromJson(needs.detect-changes.outputs.changed_kvms) }}
     steps:
+
+      - name: Select branch for environment
+        id: select_branch
+        run: |
+          echo "branch=main" >> $GITHUB_OUTPUT
+          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+          #   echo "branch=main" >> $GITHUB_OUTPUT
+          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
+          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
+          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
+          # fi
+
       - name: Checkout repo
         uses: actions/checkout@v4
 
