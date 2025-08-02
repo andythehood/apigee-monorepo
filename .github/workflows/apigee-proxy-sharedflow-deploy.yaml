@@ -121,7 +121,8 @@ jobs:
       - name: Create API Proxy bundle
         run: |
           mkdir bundle
-          zip -r bundle/${{ matrix.proxy }}.zip apiproxy
+          cd apiproxies/${{ matrix.proxy }}
+          zip -r ../../bundle/${{ matrix.proxy }}.zip apiproxy
 
       - name: Import ApigeeX Proxy
         id: import
