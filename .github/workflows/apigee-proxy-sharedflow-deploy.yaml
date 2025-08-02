@@ -133,7 +133,8 @@ jobs:
       - name: Import ApigeeX Proxy
         id: import
         run: |
-          REVISION=$(apigeecli apis import --org "$APIGEE_X_ORG" --default-token --folder ./bundle --format json | jq -r '.revision')
+          apigeecli apis import --org "$APIGEE_X_ORG" --default-token --folder ./bundle
+          REVISION=$(apigeecli apis get --org "$APIGEE_X_ORG" --default-token --name  ${{ matrix.proxy }} | jq -r '.latestRevisionId')
           echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Apigee X Proxy
