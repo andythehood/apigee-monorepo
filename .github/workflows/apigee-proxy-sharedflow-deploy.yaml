@@ -63,7 +63,13 @@ jobs:
           FILES="${{ steps.changed.outputs.changed_files }}"
 
           PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-          echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
+          # echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
+
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$PROXIES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+
 
       - name: Extract changed Shared Flow folders
         id: set-sharedflows
