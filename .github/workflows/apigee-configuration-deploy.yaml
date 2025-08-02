@@ -204,7 +204,7 @@ jobs:
           sudo chmod +x /usr/bin/yq
 
       - name: Render template with environment variable substitution from .env 
-        uses: ./.github/actions/render-json-env
+        uses: ./.github/actions/render-envvars
         with:
           template: "kvms/${{ matrix.name }}/template.yaml"
           envfile: "kvms/${{ matrix.name }}/.env.$APP_ENV"
