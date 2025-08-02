@@ -238,16 +238,16 @@ jobs:
         run: |
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) || true
+            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) 
+            STATUS=$?
 
             echo "$OUTPUT"
-            if echo "$OUTPUT" | grep -q "already exists"; then
-              echo "✅ KVM already exists, skipping."
-            elif echo "$OUTPUT" | grep -q "created successfully"; then
-              echo "✅ KVM created successfully."
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Success"
+            elif echo "$OUTPUT" | grep -q "already exists"; then
+              echo "ℹ️ Already exists, treating as success"
             else
-              echo "❌ Unexpected output:"
-              echo "$OUTPUT"
-              exit 1
+              echo "❌ Unexpected error"
+              exit $STATUS
             fi
           done
