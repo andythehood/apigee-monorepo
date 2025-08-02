@@ -65,16 +65,6 @@ jobs:
           PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
           echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
 
-
-      - name: Extract changed API Proxy folders
-        id: set-proxies
-        run: |
-          FILES="${{ steps.changed.outputs.changed_files }}"
-
-          PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-          echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
-
-
       - name: Extract changed Shared Flow folders
         id: set-sharedflows
         run: |
