@@ -1,0 +1,12 @@
+{
+  "name": "httpbin",
+  "host": "${HOST}",
+  "port": "${PORT}",
+  "isEnabled": true,
+  "sSLInfo": {
+    "enabled": "${SSL}",
+    "commonName": {},
+    "enforce": true
+  },
+  "protocol": "HTTP"
+}

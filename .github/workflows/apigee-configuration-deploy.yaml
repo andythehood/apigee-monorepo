@@ -1,0 +1,194 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Deploy ApigeeX Target Servers
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'targetservers/**'
+      - 'kvms/**'
+      - 'flowhooks/**'
+      - 'keystores/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'targetservers/**'
+      - 'kvms/**'
+      - 'flowhooks/**'
+      - 'keystores/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+  APIGEE_X_ENVS: "public private"
+
+jobs:
+  detect-changes:
+    name: Detect Changes to Target Servers and KVMs
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      changed_targetservers: ${{ steps.set-targetservers.outputs.matrix }}
+      changed_kvms: ${{ steps.set-kvms.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changes
+        id: changed
+        run: |
+          echo "Detecting changed files..."
+          echo "Event name: ${{ github.event_name }}"
+
+          # Compare with the base commit (for PRs) or previous SHA (for push)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" ${{ github.sha }} | xargs)
+
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract changed KVM folders
+        id: set-kvms
+        run: |
+          FILES="${{ steps.changed.outputs.changed_files }}"
+
+          KVMS=$(echo "$FILES" | tr ' ' '\n' | grep '^kvms/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          echo "matrix=$KVMS" >> $GITHUB_OUTPUT
+
+      - name: Extract changed Target Server folders
+        id: set-targetservers
+        run: |
+          FILES="${{ steps.changed.outputs.changed_files }}"
+
+          TARGETSERVERS=$(echo "$FILES" | tr ' ' '\n' | grep '^targetservers/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          echo "matrix=$TARGETSERVERS" >> $GITHUB_OUTPUT
+
+  deploy-targetservers:
+    name: Deploy Changed Target Servers
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_targetservers != '[]'
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      matrix:
+        name: ${{ fromJson(needs.detect-changes.outputs.changed_targetservers) }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Output Deployment Info
+        run: |
+          echo "Preparing to deploy Target Server ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+
+      # - name: Install yq
+      #   run: |
+      #     sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+      #     sudo chmod +x /usr/bin/yq
+
+      - name: Render JSON with environment variable substitution from .env 
+        uses: ./.github/actions/render-json-env
+        with:
+          template: "targetservers/${{ matrix.name }}/template.json"
+          envfile: "targetservers/${{ matrix.name }}/.env.${{ github.event.inputs.environment }}"
+          output: "targetservers/${{ matrix.name }}/output.json"
+
+      - name: Convert output to an Array for apigeecli import command
+        run: |
+          jq '[.]' targetservers/${{ matrix.name }}/output.json > targetservers/${{ matrix.name }}/targetservers.json
+          echo "✅ JSON array written to targetservers/${{ matrix.name }}/targetservers.json"
+
+      - name: Print result
+        run: cat targetservers/${{ matrix.name }}/targetservers.json
+ 
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.APIGEE_SA_KEY }}'
+
+      # - name: Set up Google Cloud SDK
+      #   uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Apigee CLI
+        run: |
+          curl -sLO https://github.com/apigee/apigeecli/releases/download/v2.13.0/apigeecli_v2.13.0_Linux_x86_64.zip
+          unzip apigeecli_v2.13.0_Linux_x86_64.zip
+          sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
+
+      - name: Deploy Apigee X Target Server
+        run: |
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
+            echo "Deploying to environment: $APIGEE_X_ENV"
+            apigeecli targetservers import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --file targetservers/${{ matrix.name }}/targetservers.json
+          done
+
+  deploy-kvms:
+    name: Deploy Changed KVMs
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_kvms != '[]'
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      matrix:
+        name: ${{ fromJson(needs.detect-changes.outputs.changed_kvms) }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Output Deployment Info
+        run: |
+          echo "Preparing to deploy KVM ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+
+      - name: Render JSON with environment variable substitution from .env 
+        uses: ./.github/actions/render-json-env
+        with:
+          template: "kvms/${{ matrix.name }}/template.json"
+          envfile: "kvms/${{ matrix.name }}/.env.${{ github.event.inputs.environment }}"
+          output: "kvms/${{ matrix.name }}/output.json"
+
+      - name: Convert output to an Array for apigeecli import command
+        run: |
+          jq '[.]' kvms/${{ matrix.name }}/output.json > kvms/${{ matrix.name }}/kvms.json
+          echo "✅ JSON array written to kvms/${{ matrix.name }}/kvms.json"
+
+      - name: Print result
+        run: cat kvms/${{ matrix.name }}/kvms.json
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.APIGEE_SA_KEY }}'
+
+      # - name: Set up Google Cloud SDK
+      #   uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Apigee CLI
+        run: |
+          curl -sLO https://github.com/apigee/apigeecli/releases/download/v2.13.0/apigeecli_v2.13.0_Linux_x86_64.zip
+          unzip apigeecli_v2.13.0_Linux_x86_64.zip
+          sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
+
+      - name: Deploy Apigee X KVM
+        run: |
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
+            echo "Deploying to environment: $APIGEE_X_ENV"
+            apigeecli kvms import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --file kvms/${{ matrix.name }}/kvms.json
+          done

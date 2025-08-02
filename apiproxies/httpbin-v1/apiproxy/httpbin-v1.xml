@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<APIProxy revision="2" name="httpbin">
+<APIProxy revision="2" name="httpbin-v1">
   <DisplayName/>
   <Description/>
   <CreatedAt>1751427661567</CreatedAt>
   <LastModifiedAt>1751427661567</LastModifiedAt>
-  <BasePaths>/httpbin</BasePaths>
+  <BasePaths>/httpbin/v1</BasePaths>
   <ProxyEndpoints>
     <ProxyEndpoint>default</ProxyEndpoint>
   </ProxyEndpoints>

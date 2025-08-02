@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Apigee Target Server Template",
+  "type": "object",
+  "properties": {
+
+    "targetserver": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "host": { "type": "string" },
+        "port": { "type": ["integer", "string"] },
+        "isEnabled": { "type": "boolean" },
+        "sSLInfo": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": ["boolean", "string"] },
+            "commonName": { "type": "object" },
+            "enforce": { "type": "boolean" }
+          },
+          "required": ["enabled", "commonName", "enforce"]
+        },
+        "protocol": { "type": "string" }
+      },
+      "required": ["name", "host", "port", "isEnabled", "sSLInfo", "protocol"]
+    }
+  },
+  "required": [ "targetserver"],
+  "additionalProperties": false
+}

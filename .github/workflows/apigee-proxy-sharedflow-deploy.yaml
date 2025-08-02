@@ -1,0 +1,210 @@
+# This is a workflow to deploy all changed ApigeeX proxies from this monorepo
+
+name: Deploy ApigeeX Proxy and Shared Flows
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'proxies/**'
+      - 'sharedflows/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'proxies/**'
+      - 'sharedflows/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+  APIGEE_X_ENVS: "public private"
+
+jobs:
+  detect-changes:
+    name: Detect Changed Proxies and Shared Flows
+    # This job detects which proxies and shared flows have changed since the last commit
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      changed_proxies: ${{ steps.set-proxies.outputs.matrix }}
+      changed_sharedflows: ${{ steps.set-sharedflows.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed proxies
+        id: changed
+        run: |
+          echo "Detecting changed files..."
+          echo "Event name: ${{ github.event_name }}"
+
+          # Compare with the base commit (for PRs) or previous SHA (for push)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" ${{ github.sha }} | xargs)
+
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract changed API Proxy folders
+        id: set-proxies
+        run: |
+          FILES="${{ steps.changed.outputs.changed_files }}"
+
+          PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
+
+
+      - name: Extract changed API Proxy folders
+        id: set-proxies
+        run: |
+          FILES="${{ steps.changed.outputs.changed_files }}"
+
+          PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
+
+
+      - name: Extract changed Shared Flow folders
+        id: set-sharedflows
+        run: |
+          FILES="${{ steps.changed.outputs.changed_files }}"
+
+          SHAREDFLOWS=$(echo "$FILES" | tr ' ' '\n' | grep '^sharedflows/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          echo "matrix=$SHAREDFLOWS" >> $GITHUB_OUTPUT
+
+  deploy-proxies:
+    name: Deploy Changed Proxies
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_proxies != '[]'
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      matrix:
+        proxy: ${{ fromJson(needs.detect-changes.outputs.changed_proxies) }}
+    steps:
+
+      - name: Select branch for environment
+        id: select_branch
+        run: |
+          echo "branch=main" >> $GITHUB_OUTPUT
+          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+          #   echo "branch=main" >> $GITHUB_OUTPUT
+          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
+          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
+          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
+          # fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.APIGEE_SA_KEY }}
+
+      - name: Install apigeelint
+        run: npm install -g apigeelint
+
+      - name: Run apigeelint
+        run: |
+          # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the number of warnings is exceeded
+          apigeelint -s ./apiproxies/${{ matrix.proxy }}/apiproxy -f stylish --maxWarnings 10
+
+      - name: Create API Proxy bundle
+        run: |
+          mkdir bundle
+          zip -r bundle/${{ matrix.proxy }}.zip apiproxy
+
+      - name: Import ApigeeX Proxy
+        id: import
+        run: |
+          REVISION=$(apigeecli apis import --org "$APIGEE_X_ORG" --default-token --folder ./bundle --format json | jq -r '.revision')
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Apigee X Proxy
+        run: |
+          echo "Deploying revision ${{ steps.import.outputs.revision }}"
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do
+            apigeecli apis deploy --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr
+          done
+
+      - name: Output Deployment Info
+        run: |
+          echo "Deployed ${{ matrix.proxy }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+
+
+  deploy-sharedflows:
+    name: Deploy Changed Shared Flows
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_sharedflows != '[]'
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      matrix:
+        sharedflow: ${{ fromJson(needs.detect-changes.outputs.changed_sharedflows) }}
+    steps:
+
+      - name: Select branch for environment
+        id: select_branch
+        run: |
+          echo "branch=main" >> $GITHUB_OUTPUT
+          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+          #   echo "branch=main" >> $GITHUB_OUTPUT
+          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
+          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
+          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
+          # fi
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.APIGEE_SA_KEY }}
+
+      - name: Install apigeelint
+        run: npm install -g apigeelint
+
+      - name: Run apigeelint
+        run: |
+          # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the number of warnings is exceeded
+          apigeelint -s ./sharedflows/${{ matrix.sharedflow }}/sharedflowbundle -f stylish --maxWarnings 10
+
+      - name: Create SharedFlow bundle
+        run: |
+          mkdir bundle
+          zip -r bundle/${{ matrix.sharedflow }}.zip sharedflowbundle
+
+      - name: Import ApigeeX Shared Flow
+        id: import
+        run: |
+          REVISION=$(apigeecli sharedflows import --org "$APIGEE_X_ORG" --default-token --folder ./bundle --format json | jq -r '.revision')
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy ApigeeX Shared Flow
+        run: |
+          echo "Deploying revision ${{ steps.import.outputs.revision }}"
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do
+            apigeecli sharedflows deploy --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name "${{ matrix.sharedflow }}" --rev ${{ steps.import.outputs.revision }} --ovr
+          done
+
+      - name: Output Deployment Info
+        run: |
+          echo "Deployed ${{ matrix.sharedflow }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+
+
+

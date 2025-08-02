@@ -1,0 +1,22 @@
+name: "Render JSON from .env"
+description: "Substitute S{VAR} environment variable placeholders in a JSON template using a .env file"
+inputs:
+  template:
+    description: "Path to the template JSON file"
+    required: true
+  envfile:
+    description: "Path to the .env file"
+    required: true
+  output:
+    description: "Path to output the rendered JSON"
+    required: true
+runs:
+  using: "composite"
+  steps:
+
+  
+    - name: Run environment substitution
+      shell: bash
+      run: |
+        chmod +x ${{ github.action_path }}/entrypoint.sh
+        ${{ github.action_path }}/entrypoint.sh "${{ inputs.template }}" "${{ inputs.envfile }}" "${{ inputs.output }}"
