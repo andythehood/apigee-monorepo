@@ -2,8 +2,6 @@
 <SharedFlowBundle revision="1" name="spikearrest">
   <DisplayName/>
   <Description/>
-  <CreatedAt>1754112985826</CreatedAt>
-  <LastModifiedAt>1754113042159</LastModifiedAt>
   <Policies>
     <Policy>SA-SpikeArrest</Policy>
   </Policies>
@@ -11,4 +9,5 @@
     <SharedFlow>default</SharedFlow>
   </SharedFlows>
   <subType>SharedFlow</subType>
+
 </SharedFlowBundle>
