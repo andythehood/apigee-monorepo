@@ -3,7 +3,6 @@
   "title": "Apigee Target Server Template",
   "type": "object",
   "properties": {
-
     "targetserver": {
       "type": "object",
       "properties": {

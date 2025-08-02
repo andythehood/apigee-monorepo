@@ -10,9 +10,9 @@ set -o allexport
 source "$ENV_FILE"
 set +o allexport
 
-# Render YAML using envsubst
+# Render template using envsubst
 envsubst < "$TEMPLATE_FILE" > "$OUTPUT_FILE"
-echo "✅ JSON template rendered to $OUTPUT_FILE"
+echo "✅ template rendered to $OUTPUT_FILE"
 
 
 

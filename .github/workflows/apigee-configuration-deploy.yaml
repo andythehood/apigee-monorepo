@@ -120,22 +120,29 @@ jobs:
         run: |
           echo "Preparing to deploy Target Server ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
 
-      # - name: Install yq
-      #   run: |
-      #     sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
-      #     sudo chmod +x /usr/bin/yq
-
-      - name: Render JSON with environment variable substitution from .env 
-        uses: ./.github/actions/render-json-env
-        with:
-          template: "targetservers/${{ matrix.name }}/template.json"
-          envfile: "targetservers/${{ matrix.name }}/.env.$APP_ENV"
-          output: "targetservers/${{ matrix.name }}/output.json"
-
-      - name: Convert output to an Array for apigeecli import command
+      - name: Install yq
         run: |
-          jq '[.]' targetservers/${{ matrix.name }}/output.json > targetservers/${{ matrix.name }}/targetservers.json
-          echo "✅ JSON array written to targetservers/${{ matrix.name }}/targetservers.json"
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+      - name: Render template with environment variable substitution from .env 
+        uses: ./.github/actions/render-envvars
+        with:
+          template: "targetservers/${{ matrix.name }}/template.yaml"
+          envfile: "targetservers/${{ matrix.name }}/.env.$APP_ENV"
+          output: "targetservers/${{ matrix.name }}/output.yaml"
+
+      - name: Render JSON from .env
+        run: |
+          # Convert YAML to JSON using yq
+          yq -o=json '[.targetserver]' targetservers/${{ matrix.name }}/output.yaml > targetservers/${{ matrix.name }}/targetservers.json
+          echo "✅ JSON written to targetservers/${{ matrix.name }}/targetservers.json"
+
+
+      # - name: Convert output to an Array for apigeecli import command
+      #   run: |
+      #     jq '[.]' targetservers/${{ matrix.name }}/output.json > targetservers/${{ matrix.name }}/targetservers.json
+      #     echo "✅ JSON array written to targetservers/${{ matrix.name }}/targetservers.json"
 
       - name: Print result
         run: cat targetservers/${{ matrix.name }}/targetservers.json
@@ -145,9 +152,6 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.APIGEE_SA_KEY }}'
-
-      # - name: Set up Google Cloud SDK
-      #   uses: google-github-actions/setup-gcloud@v2
 
       - name: Install Apigee CLI
         run: |

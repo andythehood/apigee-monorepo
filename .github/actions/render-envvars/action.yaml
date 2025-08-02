@@ -1,14 +1,14 @@
-name: "Render JSON from .env"
-description: "Substitute S{VAR} environment variable placeholders in a JSON template using a .env file"
+name: "Render template from .env"
+description: "Substitute S{VAR} environment variable placeholders in a template using a .env file"
 inputs:
   template:
-    description: "Path to the template JSON file"
+    description: "Path to the template  file"
     required: true
   envfile:
     description: "Path to the .env file"
     required: true
   output:
-    description: "Path to output the rendered JSON"
+    description: "Path to the rendered output"
     required: true
 runs:
   using: "composite"
