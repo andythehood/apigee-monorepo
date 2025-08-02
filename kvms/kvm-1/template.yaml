@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../.schemas/kvm-schema.json
+#1
+kvm:
+  name: kvm-1
+  entries:
+    - key: ${KEY1}
+      value: ${VALUE1}
+    - key: key2
+      value: value2

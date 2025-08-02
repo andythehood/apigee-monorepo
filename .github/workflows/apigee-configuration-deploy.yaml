@@ -132,7 +132,7 @@ jobs:
           envfile: "targetservers/${{ matrix.name }}/.env.$APP_ENV"
           output: "targetservers/${{ matrix.name }}/output.yaml"
 
-      - name: Render JSON from .env
+      - name: Convert output to an Array for apigeecli import command
         run: |
           # Convert YAML to JSON using yq
           yq -o=json '[.targetserver]' targetservers/${{ matrix.name }}/output.yaml > targetservers/${{ matrix.name }}/targetservers.json
@@ -159,7 +159,7 @@ jobs:
           unzip apigeecli_v2.13.0_Linux_x86_64.zip
           sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
 
-      - name: Deploy Apigee X Target Server
+      - name: Deploy ApigeeX Target Server
         run: |
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
@@ -198,20 +198,25 @@ jobs:
         run: |
           echo "Preparing to deploy KVM ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
 
-      - name: Render JSON with environment variable substitution from .env 
+      - name: Install yq
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+      - name: Render template with environment variable substitution from .env 
         uses: ./.github/actions/render-json-env
         with:
-          template: "kvms/${{ matrix.name }}/template.json"
+          template: "kvms/${{ matrix.name }}/template.yaml"
           envfile: "kvms/${{ matrix.name }}/.env.$APP_ENV"
-          output: "kvms/${{ matrix.name }}/output.json"
+          output: "kvms/${{ matrix.name }}/output.yaml"
 
-      - name: Convert output to an Array for apigeecli import command
-        run: |
-          jq '[.]' kvms/${{ matrix.name }}/output.json > kvms/${{ matrix.name }}/kvms.json
-          echo "✅ JSON array written to kvms/${{ matrix.name }}/kvms.json"
+      # - name: Convert output to an Array for apigeecli import command
+      #   run: |
+      #     jq '[.]' kvms/${{ matrix.name }}/output.json > kvms/${{ matrix.name }}/kvms.json
+      #     echo "✅ JSON array written to kvms/${{ matrix.name }}/kvms.json"
 
-      - name: Print result
-        run: cat kvms/${{ matrix.name }}/kvms.json
+      # - name: Print result
+      #   run: cat kvms/${{ matrix.name }}/kvms.json
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -219,18 +224,15 @@ jobs:
         with:
           credentials_json: '${{ secrets.APIGEE_SA_KEY }}'
 
-      # - name: Set up Google Cloud SDK
-      #   uses: google-github-actions/setup-gcloud@v2
-
       - name: Install Apigee CLI
         run: |
           curl -sLO https://github.com/apigee/apigeecli/releases/download/v2.13.0/apigeecli_v2.13.0_Linux_x86_64.zip
           unzip apigeecli_v2.13.0_Linux_x86_64.zip
           sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
 
-      - name: Deploy Apigee X KVM
+      - name: Create/Update ApigeeX KVM
         run: |
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
-            apigeecli kvms import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --file kvms/${{ matrix.name }}/kvms.json
+            apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }}
           done
