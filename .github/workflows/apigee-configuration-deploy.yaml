@@ -91,6 +91,10 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     environment: dev
+
+    env:
+      APP_ENV: dev
+
     strategy:
       matrix:
         name: ${{ fromJson(needs.detect-changes.outputs.changed_targetservers) }}
@@ -98,6 +102,7 @@ jobs:
       - name: Select branch for environment
         id: select_branch
         run: |
+          echo "github.ref_name = ${{ github.ref_name }}"
           echo "branch=main" >> $GITHUB_OUTPUT
           # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
           #   echo "branch=main" >> $GITHUB_OUTPUT
@@ -123,7 +128,7 @@ jobs:
         uses: ./.github/actions/render-json-env
         with:
           template: "targetservers/${{ matrix.name }}/template.json"
-          envfile: "targetservers/${{ matrix.name }}/.env.${{ github.event.inputs.environment }}"
+          envfile: "targetservers/${{ matrix.name }}/.env.${APP_ENV}"
           output: "targetservers/${{ matrix.name }}/output.json"
 
       - name: Convert output to an Array for apigeecli import command
@@ -192,7 +197,7 @@ jobs:
         uses: ./.github/actions/render-json-env
         with:
           template: "kvms/${{ matrix.name }}/template.json"
-          envfile: "kvms/${{ matrix.name }}/.env.${{ github.event.inputs.environment }}"
+          envfile: "kvms/${{ matrix.name }}/.env.$APP_ENV"
           output: "kvms/${{ matrix.name }}/output.json"
 
       - name: Convert output to an Array for apigeecli import command
