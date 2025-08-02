@@ -1,7 +1,7 @@
 {
   "name": "httpbin",
   "host": "${HOST}",
-  "port": "${PORT}",
+  "port": ${PORT},
   "isEnabled": true,
   "sSLInfo": {
     "enabled": "${SSL}",
@@ -11,5 +11,5 @@
   "protocol": "HTTP"
 
 
-  
+
 }
