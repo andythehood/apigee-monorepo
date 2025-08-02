@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../../.schemas/kvm-schema.json
-#6
+#7
 kvm:
   name: kvm-3
   entries:

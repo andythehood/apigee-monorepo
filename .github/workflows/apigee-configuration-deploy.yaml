@@ -236,9 +236,11 @@ jobs:
 
       - name: Create ApigeeX KVM if it doesn't exist
         run: |
+          set +e  # disable immediate exit on error
+
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) || true
+            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) 
             STATUS=$?
 
             echo "$OUTPUT"
