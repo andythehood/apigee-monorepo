@@ -8,12 +8,12 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'proxies/**'
+      - 'apiproxies/**'
       - 'sharedflows/**'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'proxies/**'
+      - 'apiproxies/**'
       - 'sharedflows/**'
 
   # Allows you to run this workflow manually from the Actions tab
