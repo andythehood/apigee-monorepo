@@ -238,7 +238,7 @@ jobs:
         run: |
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) 
+            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) || true
             STATUS=$?
 
             echo "$OUTPUT"
