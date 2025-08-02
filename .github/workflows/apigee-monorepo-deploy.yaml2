@@ -1,0 +1,179 @@
+# This is a workflow to deploy all changed ApigeeX proxies from this monorepo
+
+name: Deploy ApigeeX Proxy
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+
+env:
+  APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+  APIGEE_X_ENV: public
+  # APIGEE_PROXY_NAME: httpbin-proxy
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+
+jobs:
+  detect-changed-proxies:
+    name: Detect Changed Proxies
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      deleted_matrix: ${{ steps.set-deleted.outputs.matrix }}  # <--- ADDED
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed proxies
+        id: detect
+        run: |
+          echo "Detecting changed Apigee proxies..."
+          echo "Event name: ${{ github.event_name }}"
+
+          # Compare with the base commit (for PRs) or previous SHA (for push)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" ${{ github.sha }} \
+            | grep '^proxies/' \
+            | awk -F/ '{print $2}' \
+            | sort -u)
+
+          echo "Changed proxies:"
+          echo "$CHANGED"
+
+          echo "changed_proxies<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Set matrix
+        id: set-matrix
+        run: |
+          # Convert newline-separated list to JSON array
+          JSON=$(echo "${{ steps.detect.outputs.changed_proxies }}" | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          echo "matrix=$JSON" >> $GITHUB_OUTPUT
+
+      - name: Get deleted proxies       # <--- ADDED
+        id: detect-deleted
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          DELETED=$(git diff --name-status "$BASE" ${{ github.sha }} \
+            | grep '^D' \
+            | grep '^D[[:space:]]*proxies/' \
+            | awk '{print $2}' \
+            | awk -F/ '{print $2}' \
+            | sort -u)
+
+          echo "deleted_proxies<<EOF" >> $GITHUB_OUTPUT
+          echo "$DELETED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Set deleted matrix       # <--- ADDED
+        id: set-deleted
+        run: |
+          JSON=$(echo "${{ steps.detect-deleted.outputs.deleted_proxies }}" | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          echo "matrix=$JSON" >> $GITHUB_OUTPUT
+
+
+  deploy-proxies:
+    name: Deploy Changed Proxies
+    needs: detect-changed-proxies
+    if: needs.detect-changed-proxies.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      matrix:
+        proxy: ${{ fromJson(needs.detect-changed-proxies.outputs.matrix) }}
+    steps:
+
+      - name: Select branch for environment
+        id: select_branch
+        run: |
+          echo "branch=main" >> $GITHUB_OUTPUT
+          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+          #   echo "branch=main" >> $GITHUB_OUTPUT
+          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
+          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
+          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
+          # fi
+
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up gcloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.APIGEE_SA_KEY }}
+
+
+      # - name: Deploy ${{ matrix.proxy }} to dev
+      #   env:
+      #     APIGEE_ORG: ${{ secrets.APIGEE_ORG }}
+      #   run: |
+      #     ./scripts/deploy.sh ${{ matrix.proxy }} dev
+
+
+      - name: Install apigeelint
+        run: npm install -g apigeelint
+
+      - name: Run apigeelint
+        run: |
+          # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the number of warnings is exceeded
+          apigeelint -s ./proxies/${{ matrix.proxy }}/apiproxy -f stylish --maxWarnings 10
+
+      - name: Create API bundle
+        run: |
+          mkdir bundles
+          zip -r bundles/$APIGEE_PROXY_NAME.zip apiproxy
+
+      - name: Deploy Apigee X Proxy
+        run: |
+          apigeecli apis import --org "$APIGEE_X_ORG" --default-token --folder ./bundles
+          apigeecli apis deploy --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name "$APIGEE_PROXY_NAME" --ovr
+
+
+      - name: Output Deployment Info
+        run: |
+          echo "Deployed ${{ matrix.proxy }} to environment $APIGEE_X_ENV in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+
+
+  delete-proxies:  # <--- ADDED
+    name: Delete Removed Proxies
+    needs: detect-changed-proxies
+    if: needs.detect-changed-proxies.outputs.deleted_matrix != '[]'
+    runs-on: ubuntu-latest
+    environment: dev
+    strategy:
+      matrix:
+        proxy: ${{ fromJson(needs.detect-changed-proxies.outputs.deleted_matrix) }}
+    steps:
+      - name: Set up gcloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.APIGEE_SA_KEY }}
+
+      - name: Delete Apigee Proxy
+        run: |
+          echo "Deleting proxy: ${{ matrix.proxy }}"
+          apigeecli apis delete --org "$APIGEE_X_ORG" --name "${{ matrix.proxy }}" --default-token --force || echo "Proxy not found or already deleted."
