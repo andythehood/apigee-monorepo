@@ -214,13 +214,13 @@ jobs:
           envfile: "kvms/${{ matrix.name }}/.env.$APP_ENV"
           output: "kvms/${{ matrix.name }}/output.yaml"
 
-      # - name: Convert output to an Array for apigeecli import command
-      #   run: |
-      #     jq '[.]' kvms/${{ matrix.name }}/output.json > kvms/${{ matrix.name }}/kvms.json
-      #     echo "✅ JSON array written to kvms/${{ matrix.name }}/kvms.json"
+      - name: Convert output for apigeecli kvms entries import command
+        run: |
+          jq '.keyValueEntries = .kvm.entries | del .kvm' kvms/${{ matrix.name }}/output.json > kvms/${{ matrix.name }}/kvm-entries.json
+          echo "✅ JSON array written to kvms/${{ matrix.name }}/kvm-entries.json"
 
       # - name: Print result
-      #   run: cat kvms/${{ matrix.name }}/kvms.json
+      #   run: cat kvms/${{ matrix.name }}/kvm.json
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -250,6 +250,26 @@ jobs:
               echo "ℹ️ Already exists, treating as success"
             else
               echo "❌ Unexpected error"
+              exit $STATUS
+            fi
+          done
+
+      - name: Import entries into KVM
+        run: |
+          set +e  # disable immediate exit on error
+
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
+            echo "Import KVM entries to ${{ matrix.name }} in environment: $APIGEE_X_ENV"
+            OUTPUT=$(apigeecli kvms entries import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --file kvms/${{ matrix.name }}/kvm-entries.json 2>&1) 
+            STATUS=$?
+
+            echo "$OUTPUT"
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Successful import KVM entries into ${{ matrix.name }}  in environment $APIGEE_X_ENV"
+            # elif echo "$OUTPUT" | grep -q "already exists"; then
+            #   echo "ℹ️ Already exists, treating as success"
+            else
+              echo "❌ Unexpected error importing KVM entries into ${{ matrix.name }}  in environment $APIGEE_X_ENV"
               exit $STATUS
             fi
           done
