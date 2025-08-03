@@ -28,6 +28,7 @@ jobs:
 
     outputs:
       changed_proxies: ${{ steps.set-proxies.outputs.matrix }}
+      # deleted_proxies: ${{ steps.set-deleted-proxies.outputs.matrix }}
       changed_sharedflows: ${{ steps.set-sharedflows.outputs.matrix }}
     steps:
       - name: Checkout code
@@ -35,7 +36,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get changed proxies
+      - name: Get changed files
         id: changed
         run: |
           echo "Detecting changed files..."
@@ -54,6 +55,34 @@ jobs:
           echo "$CHANGED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Get deleted files
+        id: deleted
+        run: |
+          echo "Detecting deleted files..."
+          echo "Event name: ${{ github.event_name }}"
+
+          # Compare with the base commit (for PRs) or previous SHA (for push)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          DELETED=$(git diff --name-status "$BASE" ${{ github.sha }} \
+            | grep '^D' \
+            | grep '^D[[:space:]]*proxies/' \
+            | awk '{print $2}' \
+            | awk -F/ '{print $2}' \
+            | sort -u)
+
+
+          echo "Deleted folders: $DELETED"
+
+
+          echo "deleted_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$DELETED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Extract changed API Proxy folders
         id: set-proxies
         run: |
@@ -67,6 +96,20 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
 
+      - name: Extract deleted API Proxy folders
+        id: set-deleted-proxies
+        run: |
+          FILES="${{ steps.changed.outputs.deleted_files }}"
+          echo "Deleted files: $FILES"
+
+          PROXIES=
+
+          # PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          # # echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
+
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$PROXIES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract changed Shared Flow folders
         id: set-sharedflows
