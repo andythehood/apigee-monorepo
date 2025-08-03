@@ -55,33 +55,33 @@ jobs:
           echo "$CHANGED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Get deleted files
-        id: deleted
-        run: |
-          echo "Detecting deleted files..."
-          echo "Event name: ${{ github.event_name }}"
+      # - name: Get deleted files
+      #   id: deleted
+      #   run: |
+      #     echo "Detecting deleted files..."
+      #     echo "Event name: ${{ github.event_name }}"
 
-          # Compare with the base commit (for PRs) or previous SHA (for push)
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE=${{ github.event.pull_request.base.sha }}
-          else
-            BASE=${{ github.event.before }}
-          fi
+      #     # Compare with the base commit (for PRs) or previous SHA (for push)
+      #     if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+      #       BASE=${{ github.event.pull_request.base.sha }}
+      #     else
+      #       BASE=${{ github.event.before }}
+      #     fi
 
-          DELETED=$(git diff --name-status "$BASE" ${{ github.sha }} \
-            | grep '^D' \
-            | grep '^D[[:space:]]*proxies/' \
-            | awk '{print $2}' \
-            | awk -F/ '{print $2}' \
-            | sort -u)
-
-
-          echo "Deleted folders: $DELETED"
+      #     DELETED=$(git diff --name-status "$BASE" ${{ github.sha }} \
+      #       | grep '^D' \
+      #       | grep '^D[[:space:]]*proxies/' \
+      #       | awk '{print $2}' \
+      #       | awk -F/ '{print $2}' \
+      #       | sort -u)
 
 
-          echo "deleted_files<<EOF" >> $GITHUB_OUTPUT
-          echo "$DELETED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      #     echo "Deleted folders: $DELETED"
+
+
+      #     echo "deleted_files<<EOF" >> $GITHUB_OUTPUT
+      #     echo "$DELETED" >> $GITHUB_OUTPUT
+      #     echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract changed API Proxy folders
         id: set-proxies
@@ -95,21 +95,20 @@ jobs:
           echo "$PROXIES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      # - name: Extract deleted API Proxy folders
+      #   id: set-deleted-proxies
+      #   run: |
+      #     FILES="${{ steps.changed.outputs.deleted_files }}"
+      #     echo "Deleted files: $FILES"
 
-      - name: Extract deleted API Proxy folders
-        id: set-deleted-proxies
-        run: |
-          FILES="${{ steps.changed.outputs.deleted_files }}"
-          echo "Deleted files: $FILES"
+      #     PROXIES=
 
-          PROXIES=
+      #     # PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+      #     # # echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
 
-          # PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-          # # echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
-
-          echo "matrix<<EOF" >> $GITHUB_OUTPUT
-          echo "$PROXIES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      #     echo "matrix<<EOF" >> $GITHUB_OUTPUT
+      #     echo "$PROXIES" >> $GITHUB_OUTPUT
+      #     echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract changed Shared Flow folders
         id: set-sharedflows
@@ -150,6 +149,17 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Check if proxy folder exists
+        id: check_folder
+        run: |
+          if [ -d "apiproxies/${{ matrix.proxy }}/apiproxy" ]; then
+            echo "Proxy Folder exists"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Folder does not exist"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up gcloud
         uses: google-github-actions/auth@v2
         with:
@@ -162,20 +172,24 @@ jobs:
           sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
           
       - name: Install apigeelint
+        if: steps.check_folder.outputs.exists == 'true'
         run: npm install -g apigeelint
 
       - name: Run apigeelint
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the number of warnings is exceeded
           apigeelint -s ./apiproxies/${{ matrix.proxy }}/apiproxy -f stylish --maxWarnings 10
 
       - name: Create API Proxy bundle
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           mkdir bundle
           cd apiproxies/${{ matrix.proxy }}
           zip -r ../../bundle/${{ matrix.proxy }}.zip apiproxy
 
       - name: Import ApigeeX Proxy
+        if: steps.check_folder.outputs.exists == 'true'
         id: import
         run: |
           apigeecli apis import --org "$APIGEE_X_ORG" --default-token --folder ./bundle
@@ -183,6 +197,7 @@ jobs:
           echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Apigee X Proxy
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           echo "Deploying revision ${{ steps.import.outputs.revision }}"
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do
@@ -190,8 +205,19 @@ jobs:
           done
 
       - name: Output Deployment Info
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           echo "Deployed ${{ matrix.proxy }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+
+      - name: Undeploy Deleted Proxies
+        if: steps.check_folder.outputs.exists == 'false'
+        run: |
+          echo "Proxy ${{ matrix.proxy }} does not exist. Undeploying from all Environments."
+
+      - name: Remove Deleted Proxies
+        if: steps.check_folder.outputs.exists == 'false'
+        run: |
+          echo "Proxy ${{ matrix.proxy }} does not exist. Deleting from Organization."
 
 
   deploy-sharedflows:
