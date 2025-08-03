@@ -32,9 +32,9 @@ jobs:
     name: Detect Changes to Target Servers and KVMs
     runs-on: ubuntu-latest
     environment: dev
-    env:
-      APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-      APIGEE_X_ENVS: "public private"
+    # env:
+    #   APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+    #   APIGEE_X_ENVS: "public private"
     outputs:
       changed_targetservers: ${{ steps.set-targetservers.outputs.matrix }}
       changed_kvms: ${{ steps.set-kvms.outputs.matrix }}
@@ -137,12 +137,6 @@ jobs:
           # Convert YAML to JSON using yq
           yq -o=json '[.targetserver]' targetservers/${{ matrix.name }}/output.yaml > targetservers/${{ matrix.name }}/targetservers.json
           echo "✅ JSON written to targetservers/${{ matrix.name }}/targetservers.json"
-
-
-      # - name: Convert output to an Array for apigeecli import command
-      #   run: |
-      #     jq '[.]' targetservers/${{ matrix.name }}/output.json > targetservers/${{ matrix.name }}/targetservers.json
-      #     echo "✅ JSON array written to targetservers/${{ matrix.name }}/targetservers.json"
 
       - name: Print result
         run: cat targetservers/${{ matrix.name }}/targetservers.json
@@ -265,11 +259,11 @@ jobs:
 
             echo "$OUTPUT"
             if [ "$STATUS" -eq 0 ]; then
-              echo "✅ Successful import KVM entries into ${{ matrix.name }}  in environment $APIGEE_X_ENV"
+              echo "✅ Successful import KVM entries into ${{ matrix.name }} in environment $APIGEE_X_ENV"
             # elif echo "$OUTPUT" | grep -q "already exists"; then
             #   echo "ℹ️ Already exists, treating as success"
             else
-              echo "❌ Unexpected error importing KVM entries into ${{ matrix.name }}  in environment $APIGEE_X_ENV"
+              echo "❌ Unexpected error importing KVM entries into ${{ matrix.name }} in environment $APIGEE_X_ENV"
               exit $STATUS
             fi
           done
