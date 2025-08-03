@@ -3,7 +3,7 @@
 kvm:
   name: kvm-3
   entries:
-    - key: ${KEY1}
+    - name: ${KEY1}
       value: ${VALUE1}
-    - key: key2
+    - name: key2
       value: value2
