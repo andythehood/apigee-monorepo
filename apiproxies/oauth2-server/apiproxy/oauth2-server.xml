@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<APIProxy revision="8" name="oauth2-server">
+  <DisplayName/>
+  <Description/>
+  <CreatedAt>1751714578839</CreatedAt>
+  <LastModifiedAt>1751714578839</LastModifiedAt>
+  <BasePaths>/.well-known/openid-configuration</BasePaths>
+  <BasePaths>/oauth2/v1</BasePaths>
+  <Policies>
+    <Policy>AM-WellKnownOpenIDConfig</Policy>
+    <Policy>OAuthV2-GenerateAccessToken</Policy>
+  </Policies>
+  <ProxyEndpoints>
+    <ProxyEndpoint>discovery</ProxyEndpoint>
+    <ProxyEndpoint>oauth2</ProxyEndpoint>
+  </ProxyEndpoints>
+  
+</APIProxy>

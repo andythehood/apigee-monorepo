@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<AssignMessage continueOnError="false" enabled="true" name="AM-WellKnownOpenIDConfig">
+  <DisplayName>AM-WellKnownOpenIDConfig</DisplayName>
+  <Properties/>
+  <Set>
+    <Payload contentType="application/json">
+{
+  "issuer":"https://34.40.159.97.nip.io",
+  "token_endpoint": "https://34.40.159.97.nip.io/oauth2/v1/token",
+      "grant_types_supported": [
+        "client_credentials"
+        ]
+  }
+    </Payload>
+  </Set>
+  <IgnoreUnresolvedVariables>true</IgnoreUnresolvedVariables>
+  <AssignTo>response</AssignTo>
+</AssignMessage>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OAuthV2 continueOnError="false" enabled="true" name="OAuthV2-GenerateAccessToken">
+  <DisplayName>OAuthV2-GenerateAccessToken</DisplayName>
+  <Properties/>
+  <Attributes/>
+  <ExternalAuthorization>false</ExternalAuthorization>
+  <Operation>GenerateAccessToken</Operation>
+  <SupportedGrantTypes>
+    <GrantType>client_credentials</GrantType>
+  </SupportedGrantTypes>&gt;
+  <GenerateResponse enabled="true"/>
+  <Tokens/>
+  <RFCCompliantRequestResponse>true</RFCCompliantRequestResponse>
+</OAuthV2>
