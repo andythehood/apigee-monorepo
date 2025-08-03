@@ -23,18 +23,12 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# env:
-#   APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-#   APIGEE_X_ENVS: "public private"
 
 jobs:
   detect-changes:
     name: Detect Changes to Target Servers and KVMs
     runs-on: ubuntu-latest
     environment: dev
-    # env:
-    #   APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-    #   APIGEE_X_ENVS: "public private"
     outputs:
       changed_targetservers: ${{ steps.set-targetservers.outputs.matrix }}
       changed_kvms: ${{ steps.set-kvms.outputs.matrix }}
@@ -100,25 +94,13 @@ jobs:
       matrix:
         name: ${{ fromJson(needs.detect-changes.outputs.changed_targetservers) }}
     steps:
-      - name: Select branch for environment
-        id: select_branch
-        run: |
-          echo "github.ref_name = ${{ github.ref_name }}"
-          echo "branch=main" >> $GITHUB_OUTPUT
-          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
-          #   echo "branch=main" >> $GITHUB_OUTPUT
-          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
-          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
-          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
-          # fi
 
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Output Deployment Info
         run: |
-          echo "Preparing to deploy Target Server ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+          echo "Preparing to deploy Target Server ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ github.ref_name }}"
 
       - name: Install yq
         run: |
@@ -178,24 +160,12 @@ jobs:
         name: ${{ fromJson(needs.detect-changes.outputs.changed_kvms) }}
     steps:
 
-      - name: Select branch for environment
-        id: select_branch
-        run: |
-          echo "branch=main" >> $GITHUB_OUTPUT
-          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
-          #   echo "branch=main" >> $GITHUB_OUTPUT
-          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
-          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
-          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
-          # fi
-
       - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Output Deployment Info
         run: |
-          echo "Preparing to deploy KVM ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+          echo "Preparing to deploy KVM ${{ matrix.name }} to $APIGEE_X_ORG from branch ${{ github.ref_name }}"
 
       - name: Install yq
         run: |

@@ -55,34 +55,6 @@ jobs:
           echo "$CHANGED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # - name: Get deleted files
-      #   id: deleted
-      #   run: |
-      #     echo "Detecting deleted files..."
-      #     echo "Event name: ${{ github.event_name }}"
-
-      #     # Compare with the base commit (for PRs) or previous SHA (for push)
-      #     if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-      #       BASE=${{ github.event.pull_request.base.sha }}
-      #     else
-      #       BASE=${{ github.event.before }}
-      #     fi
-
-      #     DELETED=$(git diff --name-status "$BASE" ${{ github.sha }} \
-      #       | grep '^D' \
-      #       | grep '^D[[:space:]]*proxies/' \
-      #       | awk '{print $2}' \
-      #       | awk -F/ '{print $2}' \
-      #       | sort -u)
-
-
-      #     echo "Deleted folders: $DELETED"
-
-
-      #     echo "deleted_files<<EOF" >> $GITHUB_OUTPUT
-      #     echo "$DELETED" >> $GITHUB_OUTPUT
-      #     echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Extract changed API Proxy folders
         id: set-proxies
         run: |
@@ -94,21 +66,6 @@ jobs:
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
           echo "$PROXIES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      # - name: Extract deleted API Proxy folders
-      #   id: set-deleted-proxies
-      #   run: |
-      #     FILES="${{ steps.changed.outputs.deleted_files }}"
-      #     echo "Deleted files: $FILES"
-
-      #     PROXIES=
-
-      #     # PROXIES=$(echo "$FILES" | tr ' ' '\n' | grep '^apiproxies/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
-      #     # # echo "matrix=$PROXIES" >> $GITHUB_OUTPUT
-
-      #     echo "matrix<<EOF" >> $GITHUB_OUTPUT
-      #     echo "$PROXIES" >> $GITHUB_OUTPUT
-      #     echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract changed Shared Flow folders
         id: set-sharedflows
@@ -134,20 +91,12 @@ jobs:
         proxy: ${{ fromJson(needs.detect-changes.outputs.changed_proxies) }}
     steps:
 
-      - name: Select branch for environment
-        id: select_branch
-        run: |
-          echo "branch=main" >> $GITHUB_OUTPUT
-          # if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
-          #   echo "branch=main" >> $GITHUB_OUTPUT
-          # # elif [ "${{ github.event.inputs.environment }}" = "sit" ]; then
-          # #   echo "branch=feature/sit" >> $GITHUB_OUTPUT
-          # elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-          #   echo "branch=feature/prod" >> $GITHUB_OUTPUT
-          # fi
-
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      # The committed changes may have deleted the proxy folder, so we need to check whether it still exists
+      # If it does, then we proceed with the deployment
+      # If it does not, we undeploy the proxy from all environments
 
       - name: Check if proxy folder exists
         id: check_folder
@@ -208,8 +157,9 @@ jobs:
       - name: Output Deployment Info
         if: steps.check_folder.outputs.exists == 'true'
         run: |
-          echo "Deployed ${{ matrix.proxy }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
+          echo "Deployed ${{ matrix.proxy }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ github.ref_name }}"
 
+      # The committed changes have deleted the proxy, so we undeploy the proxy from all environments          
       - name: Undeploy Deleted Proxies
         if: steps.check_folder.outputs.exists == 'false'
         run: |
@@ -222,8 +172,8 @@ jobs:
 
             if [ "$STATUS" -eq 0 ]; then
               echo "✅ Success"
-            # elif echo "$OUTPUT" | grep -q "already exists"; then
-            #   echo "ℹ️ Already exists, treating as success"
+            elif echo "$OUTPUT" | grep -q "is not deployed"; then
+              echo "ℹ️ Proxy is not deployed to this environment, so treating as success"
             else
               echo "❌ Unexpected error"
               exit $STATUS
@@ -235,7 +185,6 @@ jobs:
         run: |
           echo "Proxy ${{ matrix.proxy }} does not exist. Deleting from Organization."
           # TODO: Add logic to delete the proxy from the organization
-
 
   deploy-sharedflows:
     name: Deploy Changed Shared Flows
@@ -266,6 +215,9 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # The committed changes may have deleted the sharedflow folder, so we need to check whether it still exists
+      # If it does, then we proceed with the deployment
+      # If it does not, we undeploy the sharedflow from all environments
       - name: Check if sharedflow folder exists
         id: check_folder
         run: |
@@ -327,25 +279,44 @@ jobs:
         run: |
           echo "Deployed ${{ matrix.sharedflow }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
 
+      # The committed changes have deleted the sharedflow, so we undeploy the sharedflow from all environments          
       - name: Undeploy Deleted Sharedflows
         if: steps.check_folder.outputs.exists == 'false'
         run: |
           set +e  # disable immediate exit on error
-          echo "Proxy ${{ matrix.sharedflow }} does not exist. Undeploying from all Environments."
-          ENVS=$(apigeecli environments list --default-token -o "$APIGEE_X_ORG" | jq -r '. | join(" ")')
-          for APIGEE_X_ENV in $ENVS; do
-            OUTPUT=$(apigeecli sharedflows undeploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.sharedflow }}")
-            STATUS=$?
+          echo "Sharedflow ${{ matrix.sharedflow }} does not exist. Undeploying from all Environments."
 
-            if [ "$STATUS" -eq 0 ]; then
-              echo "✅ Success"
-            # elif echo "$OUTPUT" | grep -q "already exists"; then
-            #   echo "ℹ️ Already exists, treating as success"
-            else
-              echo "❌ Unexpected error"
-              exit $STATUS
+          DEPLOYMENTS=$(apigeecli sharedflows listdeploy --default-token -o "$APIGEE_X_ORG" --name "${{ matrix.sharedflow }}")
+          STATUS=$?
+
+          if [ "$STATUS" -eq 0 ]; then
+            echo "✅ Success"
+
+            if echo "$DEPLOYMENTS" | jq -e '.deployments and (.deployments | length > 0)' >/dev/null; then
+              echo "$DEPLOYMENTS" | jq -c '.deployments[]' | while read -r deployment; do
+                environment=$(echo "$deployment" | jq -r '.environment')
+                proxy=$(echo "$deployment" | jq -r '.apiProxy')
+                revision=$(echo "$deployment" | jq -r '.revision')
+
+                OUTPUT=$(apigeecli sharedflows undeploy --default-token -o "$APIGEE_X_ORG" -e "$environment" --name "$proxy"  --rev "$revision")
+                STATUS=$?
+
+                if [ "$STATUS" -eq 0 ]; then
+                  echo "✅ Success"
+                else
+                  echo "❌ Unexpected error"
+                  exit $STATUS
+                fi
+              done
             fi
-          done
+
+          elif echo "$DEPLOYMENTS" | grep -q "not found"; then
+            echo "ℹ️ Sharedflow is not deployed, so treating as success"
+          else
+            echo "❌ Unexpected error"
+            exit $STATUS
+          fi
+
 
       - name: Remove Deleted Sharedflows
         if: steps.check_folder.outputs.exists == 'false'
