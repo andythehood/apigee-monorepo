@@ -260,7 +260,7 @@ jobs:
 
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Import KVM entries to ${{ matrix.name }} in environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli kvms entries import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --file kvms/${{ matrix.name }}/kvm-entries.json 2>&1) 
+            OUTPUT=$(apigeecli kvms entries import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --map ${{ matrix.name }} --file kvms/${{ matrix.name }}/kvm-entries.json 2>&1) 
             STATUS=$?
 
             echo "$OUTPUT"
