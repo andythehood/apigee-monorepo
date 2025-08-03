@@ -219,8 +219,8 @@ jobs:
           yq -o json '.keyValueEntries = .kvm.entries | del .kvm' kvms/${{ matrix.name }}/output.yaml > kvms/${{ matrix.name }}/kvm-entries.json
           echo "✅ KVM entries written to kvms/${{ matrix.name }}/kvm-entries.json"
 
-      # - name: Print result
-      #   run: cat kvms/${{ matrix.name }}/kvm.json
+      - name: Print result
+        run: cat kvms/${{ matrix.name }}/kvm-entries.json
 
       - name: Authenticate to Google Cloud
         id: auth
