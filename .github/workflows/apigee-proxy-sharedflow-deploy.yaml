@@ -173,7 +173,8 @@ jobs:
           
       - name: Install apigeelint
         if: steps.check_folder.outputs.exists == 'true'
-        run: npm install -g apigeelint
+        run: |
+          npm install -g apigeelint
 
       - name: Run apigeelint
         if: steps.check_folder.outputs.exists == 'true'
@@ -192,16 +193,16 @@ jobs:
         if: steps.check_folder.outputs.exists == 'true'
         id: import
         run: |
-          apigeecli apis import --org "$APIGEE_X_ORG" --default-token --folder ./bundle
-          REVISION=$(apigeecli apis get --org "$APIGEE_X_ORG" --default-token --name  ${{ matrix.proxy }} | jq -r '.latestRevisionId')
+          apigeecli apis import --default-token -o "$APIGEE_X_ORG"  --folder ./bundle
+          REVISION=$(apigeecli apis get --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.proxy }} | jq -r '.latestRevisionId')
           echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy Apigee X Proxy
+      - name: Deploy ApigeeX Proxy
         if: steps.check_folder.outputs.exists == 'true'
         run: |
           echo "Deploying revision ${{ steps.import.outputs.revision }}"
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do
-            apigeecli apis deploy --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr
+            apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr
           done
 
       - name: Output Deployment Info
@@ -212,12 +213,28 @@ jobs:
       - name: Undeploy Deleted Proxies
         if: steps.check_folder.outputs.exists == 'false'
         run: |
+          set +e  # disable immediate exit on error
           echo "Proxy ${{ matrix.proxy }} does not exist. Undeploying from all Environments."
+          ENVS=$(apigeecli environments list --default-token -o "$APIGEE_X_ORG"  | jq -r '. | join(" ")')
+          for APIGEE_X_ENV in $ENVS; do
+            OUTPUT=$(apigeecli apis undeploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}")
+            STATUS=$?
+
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Success"
+            # elif echo "$OUTPUT" | grep -q "already exists"; then
+            #   echo "ℹ️ Already exists, treating as success"
+            else
+              echo "❌ Unexpected error"
+              exit $STATUS
+            fi
+          done
 
       - name: Remove Deleted Proxies
         if: steps.check_folder.outputs.exists == 'false'
         run: |
           echo "Proxy ${{ matrix.proxy }} does not exist. Deleting from Organization."
+          # TODO: Add logic to delete the proxy from the organization
 
 
   deploy-sharedflows:
@@ -249,6 +266,17 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Check if sharedflow folder exists
+        id: check_folder
+        run: |
+          if [ -d "sharedflows/${{ matrix.sharedflow }}/sharedflowbundle" ]; then
+            echo "Sharedflow folder exists"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Folder does not exist"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up gcloud
         uses: google-github-actions/auth@v2
         with:
@@ -261,37 +289,66 @@ jobs:
           sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
 
       - name: Install apigeelint
-        run: npm install -g apigeelint
+        if: steps.check_folder.outputs.exists == 'true'
+        run: |
+          npm install -g apigeelint
 
       - name: Run apigeelint
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           # set maxWarnings to -1 to ignore warnings, otherwise set to a number to fail build if the number of warnings is exceeded
           apigeelint -s ./sharedflows/${{ matrix.sharedflow }}/sharedflowbundle -f stylish --maxWarnings 10
 
       - name: Create SharedFlow bundle
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           mkdir bundle
           cd sharedflows/${{ matrix.sharedflow }}
           zip -r ../../bundle/${{ matrix.sharedflow }}.zip sharedflowbundle
 
       - name: Import ApigeeX Shared Flow
+        if: steps.check_folder.outputs.exists == 'true'
         id: import
         run: |
-
-          apigeecli sharedflows import --org "$APIGEE_X_ORG" --default-token --folder ./bundle
-          REVISION=$(apigeecli sharedflows get --org "$APIGEE_X_ORG" --default-token --name  ${{ matrix.sharedflow }} | jq -r '.latestRevisionId')
+          apigeecli sharedflows import --default-token -o "$APIGEE_X_ORG" --folder ./bundle
+          REVISION=$(apigeecli sharedflows get --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.sharedflow }} | jq -r '.latestRevisionId')
           echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
 
       - name: Deploy ApigeeX Shared Flow
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           echo "Deploying revision ${{ steps.import.outputs.revision }}"
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do
-            apigeecli sharedflows deploy --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name "${{ matrix.sharedflow }}" --rev ${{ steps.import.outputs.revision }} --ovr
+            apigeecli sharedflows deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.sharedflow }}" --rev ${{ steps.import.outputs.revision }} --ovr
           done
 
       - name: Output Deployment Info
+        if: steps.check_folder.outputs.exists == 'true'
         run: |
           echo "Deployed ${{ matrix.sharedflow }} to environments $APIGEE_X_ENVS in project $APIGEE_X_ORG from branch ${{ steps.select_branch.outputs.branch }}"
 
+      - name: Undeploy Deleted Sharedflows
+        if: steps.check_folder.outputs.exists == 'false'
+        run: |
+          set +e  # disable immediate exit on error
+          echo "Proxy ${{ matrix.sharedflow }} does not exist. Undeploying from all Environments."
+          ENVS=$(apigeecli environments list --default-token -o "$APIGEE_X_ORG" | jq -r '. | join(" ")')
+          for APIGEE_X_ENV in $ENVS; do
+            OUTPUT=$(apigeecli sharedflows undeploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.sharedflow }}")
+            STATUS=$?
 
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Success"
+            # elif echo "$OUTPUT" | grep -q "already exists"; then
+            #   echo "ℹ️ Already exists, treating as success"
+            else
+              echo "❌ Unexpected error"
+              exit $STATUS
+            fi
+          done
 
+      - name: Remove Deleted Sharedflows
+        if: steps.check_folder.outputs.exists == 'false'
+        run: |
+          echo "Sharedflow ${{ matrix.sharedflow }} does not exist. Deleting from Organization."
+          # TODO: Add logic to delete the sharedflow from the organization

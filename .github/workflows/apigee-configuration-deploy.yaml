@@ -139,7 +139,8 @@ jobs:
           echo "✅ JSON written to targetservers/${{ matrix.name }}/targetservers.json"
 
       - name: Print result
-        run: cat targetservers/${{ matrix.name }}/targetservers.json
+        run: |
+          cat targetservers/${{ matrix.name }}/targetservers.json
  
       - name: Authenticate to Google Cloud
         id: auth
@@ -157,7 +158,7 @@ jobs:
         run: |
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
-            apigeecli targetservers import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --file targetservers/${{ matrix.name }}/targetservers.json
+            apigeecli targetservers import --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --file targetservers/${{ matrix.name }}/targetservers.json
           done
 
   deploy-kvms:
@@ -214,7 +215,8 @@ jobs:
           echo "✅ KVM entries written to kvms/${{ matrix.name }}/kvm-entries.json"
 
       - name: Print result
-        run: cat kvms/${{ matrix.name }}/kvm-entries.json
+        run: |
+          cat kvms/${{ matrix.name }}/kvm-entries.json
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -234,7 +236,7 @@ jobs:
 
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Deploying to environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli kvms create --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --name ${{ matrix.name }} 2>&1) 
+            OUTPUT=$(apigeecli kvms create --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name ${{ matrix.name }} 2>&1) 
             STATUS=$?
 
             echo "$OUTPUT"
@@ -254,7 +256,7 @@ jobs:
 
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
             echo "Import KVM entries to ${{ matrix.name }} in environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli kvms entries import --org "$APIGEE_X_ORG" --env "$APIGEE_X_ENV" --default-token --map ${{ matrix.name }} --file kvms/${{ matrix.name }}/kvm-entries.json 2>&1) 
+            OUTPUT=$(apigeecli kvms entries import --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --map ${{ matrix.name }} --file kvms/${{ matrix.name }}/kvm-entries.json 2>&1) 
             STATUS=$?
 
             echo "$OUTPUT"
