@@ -9,4 +9,10 @@ targetserver:
     enabled: ${SSL}
     commonName: {}
     enforce: true
+    ciphers:
+    - "TLS_DH_DSS_WITH_CAMELLIA_128_CBC_SHA"
+    - "TLS_DH_RSA_WITH_CAMELLIA_128_CBC_SHA"
+    protocols:
+    - "TLSv1.2"
+    - "TLSv1.3"
   protocol: http
