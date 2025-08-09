@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../.schemas/targetserver-schema.json
+#1
+targetserver:
+  name: httpbin32
+  host: ${HOST}
+  port: ${PORT}
+  isEnabled: true
+  sSLInfo:
+    enabled: ${SSL}
+    commonName: {}
+    enforce: true
+  protocol: http
