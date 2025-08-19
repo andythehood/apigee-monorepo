@@ -86,7 +86,7 @@ jobs:
       - name: Check if Data Collector folder exists
         id: check_folder
         run: |
-          if [ -d "kvms/${{ matrix.datacollector }}" ]; then
+          if [ -d "datacollectors/${{ matrix.datacollector }}" ]; then
             echo "Data Collector folder exists"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
@@ -145,17 +145,15 @@ jobs:
         run: |
           set +e  # disable immediate exit on error
           echo "Data Collector ${{ matrix.datacollector }} does not exist. Undeploying from all Environments."
-          ENVS=$(apigeecli environments list --default-token -o "$APIGEE_X_ORG"  | jq -r '. | join(" ")')
-          for APIGEE_X_ENV in $ENVS; do
-            OUTPUT=$(apigeecli datacollectors delete --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.datacollector }}")
-            STATUS=$?
 
-            if [ "$STATUS" -eq 0 ]; then
-              echo "✅ Success"
-            elif echo "$OUTPUT" | grep -q "not found"; then
-              echo "ℹ️ KVM is not deployed to this environment, so ignoring delete"
-            else
-              echo "❌ Unexpected error"
-              exit $STATUS
-            fi
-          done
+          OUTPUT=$(apigeecli datacollectors delete --default-token -o "$APIGEE_X_ORG"  --name "${{ matrix.datacollector }}")
+          STATUS=$?
+
+          if [ "$STATUS" -eq 0 ]; then
+            echo "✅ Success"
+          elif echo "$OUTPUT" | grep -q "not found"; then
+            echo "ℹ️ KVM is not deployed to this environment, so ignoring delete"
+          else
+            echo "❌ Unexpected error"
+            exit $STATUS
+          fi
