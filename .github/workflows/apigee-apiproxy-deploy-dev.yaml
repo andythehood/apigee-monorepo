@@ -80,6 +80,20 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Get Environments
+        id: get-envs
+        run: |
+          # Get the environments from the CONFIG file, else default to APIGEE_X_ENVS environment variable in job
+
+          if [ -f "apiproxies/${{ matrix.proxy }}/CONFIG.yaml" ]; then
+            APIGEE_X_ENVS=$(yq eval '.apiproxy.environments | join(" ")' "apiproxies/${{ matrix.proxy }}/CONFIG.yaml")
+            echo "APIGEE_X_ENVS=$APIGEE_X_ENVS" >> "$GITHUB_ENV"
+          fi
+
+      - name: Apigee Environments
+        run: echo "The value is $APIGEE_X_ENVS"
+
+
       # The committed changes may have deleted the proxy folder, so we need to check whether it still exists
       # If it does, then we proceed with the deployment
       # If it does not, we undeploy the proxy from all environments
