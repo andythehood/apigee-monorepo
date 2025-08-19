@@ -136,12 +136,12 @@ jobs:
             exit $STATUS
           fi
 
-      # The committed changes have deleted the kvm, so we delete the datacollector from all environments          
+      # The committed changes have deleted the kvm, so we delete the datacollector from the Org          
       - name: Remove Deleted Data Collectors
         if: steps.check_folder.outputs.exists == 'false'
         run: |
           set +e  # disable immediate exit on error
-          echo "Data Collector ${{ matrix.datacollector }} does not exist. Undeploying from all Environments."
+          echo "Data Collector ${{ matrix.datacollector }} does not exist. Undeploying from the Org."
 
           OUTPUT=$(apigeecli datacollectors delete --default-token -o "$APIGEE_X_ORG"  --name "${{ matrix.datacollector }}")
           STATUS=$?
