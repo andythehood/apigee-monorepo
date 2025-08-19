@@ -12,7 +12,7 @@
   </PostFlow>
   <Flows/>
   <HTTPProxyConnection>
-    <BasePath>/httpbin/v1</BasePath>
+    <BasePath>/httpbin/v3</BasePath>
     <Properties/>
   </HTTPProxyConnection>
   <RouteRule name="default">
