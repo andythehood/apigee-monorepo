@@ -2,5 +2,4 @@ apiproxy:
   environments:
     - public
     - private
-    
   serviceAccount: null
