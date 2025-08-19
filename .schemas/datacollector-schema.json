@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Apigee Data Collector",
+  "type": "object",
+  "properties": {
+    "datacollector": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^dc_[a-zA-Z0-9_-]+$",
+          "description": "The name of the data collector. Must be alphanumeric and start with 'dc_'."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "STRING",
+            "BOOLEAN",
+            "DATETIME",
+            "FLOAT",
+            "INTEGER"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "datacollector"
+  ],
+  "additionalProperties": false
+}
