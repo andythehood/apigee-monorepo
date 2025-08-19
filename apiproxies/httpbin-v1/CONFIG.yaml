@@ -3,4 +3,4 @@ apiproxy:
     - public
     - private
     - partner
-  serviceAccount: aa@iam.google.com
+  serviceAccount: null
