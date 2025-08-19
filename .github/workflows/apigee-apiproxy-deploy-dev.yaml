@@ -93,6 +93,18 @@ jobs:
       - name: Apigee Environments
         run: echo "The value is $APIGEE_X_ENVS"
 
+      - name: Get Service Account
+        id: get-sa
+        run: |
+          # Get the service account from the CONFIG file, else default n
+
+          if [ -f "apiproxies/${{ matrix.proxy }}/CONFIG.yaml" ]; then
+            APIGEE_X_SA=$(yq eval '.apiproxy.serviceAccount' "apiproxies/${{ matrix.proxy }}/CONFIG.yaml")
+            echo "APIGEE_X_SA=$APIGEE_X_SA" >> "$GITHUB_ENV"
+          fi
+
+      - name: Apigee SA
+        run: echo "The value is $APIGEE_X_SA"
 
       # The committed changes may have deleted the proxy folder, so we need to check whether it still exists
       # If it does, then we proceed with the deployment
@@ -157,7 +169,13 @@ jobs:
         run: |
           echo "Deploying revision ${{ steps.import.outputs.revision }}"
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do
-            apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr
+            if [ -n "$APIGEE_X_SA" ]; then
+              echo "Using service account: $APIGEE_X_SA"
+              apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr --sa "$APIGEE_X_SA"
+            else
+              echo "No service account specified, deploying without service account"
+              apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr
+            fi
           done
 
       # The committed changes have deleted the proxy, so we undeploy the proxy from all environments          
