@@ -121,9 +121,9 @@ jobs:
         run: |
           set +e  # disable immediate exit on error
 
-          type=$(echo "datacollectors/${{ matrix.datacollector }}/datacollector.yaml" | yq -r '.datacollector.type')
+          TYPE=$(cat "datacollectors/${{ matrix.datacollector }}/datacollector.yaml" | yq -r '.datacollector.type')
 
-          OUTPUT=$(apigeecli datacollectors create --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.datacollector }} --type $type 2>&1) 
+          OUTPUT=$(apigeecli datacollectors create --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.datacollector }} --type $TYPE 2>&1) 
           STATUS=$?
 
           echo "$OUTPUT"
