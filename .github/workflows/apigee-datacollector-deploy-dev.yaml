@@ -121,23 +121,20 @@ jobs:
         run: |
           set +e  # disable immediate exit on error
 
-          type=$(echo "datacollectors/${{ matrix.datacollector }}/datacollector.yaml"" | jq -r '.datacollector.type')
+          type=$(echo "datacollectors/${{ matrix.datacollector }}/datacollector.yaml" | yq -r '.datacollector.type')
 
-          for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
-            echo "Deploying to environment: $APIGEE_X_ENV"
-            OUTPUT=$(apigeecli datacollectors create --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name ${{ matrix.datacollector }} --type $type 2>&1) 
-            STATUS=$?
+          OUTPUT=$(apigeecli datacollectors create --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.datacollector }} --type $type 2>&1) 
+          STATUS=$?
 
-            echo "$OUTPUT"
-            if [ "$STATUS" -eq 0 ]; then
-              echo "✅ Success"
-            elif echo "$OUTPUT" | grep -q "already exists"; then
-              echo "ℹ️ Already exists, treating as success"
-            else
-              echo "❌ Unexpected error"
-              exit $STATUS
-            fi
-          done
+          echo "$OUTPUT"
+          if [ "$STATUS" -eq 0 ]; then
+            echo "✅ Success"
+          elif echo "$OUTPUT" | grep -q "already exists"; then
+            echo "ℹ️ Already exists, treating as success"
+          else
+            echo "❌ Unexpected error"
+            exit $STATUS
+          fi
 
       # The committed changes have deleted the kvm, so we delete the datacollector from all environments          
       - name: Remove Deleted Data Collectors

@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=../../.schemas/datacollector-schema.json
-#2
+#3
 datacollector:
   name: dc_boolean
   type: BOOLEAN
