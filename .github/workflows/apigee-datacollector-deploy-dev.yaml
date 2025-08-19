@@ -58,6 +58,7 @@ jobs:
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
           echo "$DATACOLLECTORS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          echo ${DATACOLLECTORS} 
 
   deploy-datacollectors:
     name: Deploy Changed Data Collectors
