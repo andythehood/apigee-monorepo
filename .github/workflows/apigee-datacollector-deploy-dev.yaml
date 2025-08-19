@@ -49,17 +49,17 @@ jobs:
           echo "$CHANGED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Extract changed KVM folders
+      - name: Extract changed Data Collector folders
         id: set-datacollectors
         run: |
           FILES="${{ steps.changed.outputs.changed_files }}"
 
-          DATACOLLECTORS=$(echo "$FILES" | tr ' ' '\n' | grep '^kvms/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          DATACOLLECTORS=$(echo "$FILES" | tr ' ' '\n' | grep '^datacollectors/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
           echo "$DATACOLLECTORS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  deploy-kvms:
+  deploy-datacollectors:
     name: Deploy Changed Data Collectors
     needs: detect-changes
     if: needs.detect-changes.outputs.datacollectors != '[]'
