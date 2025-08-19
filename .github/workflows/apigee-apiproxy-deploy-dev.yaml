@@ -169,12 +169,12 @@ jobs:
         run: |
           echo "Deploying revision ${{ steps.import.outputs.revision }}"
           for APIGEE_X_ENV in $APIGEE_X_ENVS; do
-            if [ -n "$APIGEE_X_SA" ]; then
-              echo "Using service account: $APIGEE_X_SA"
-              apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr --sa "$APIGEE_X_SA"
-            else
+            if [ -z "$APIGEE_X_SA" ] || ["$APIGEE_X_SA" = "null"]; then
               echo "No service account specified, deploying without service account"
               apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr
+            else
+              echo "Using service account: $APIGEE_X_SA"
+              apigeecli apis deploy --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.proxy }}" --rev ${{ steps.import.outputs.revision }} --ovr --sa "$APIGEE_X_SA"
             fi
           done
 
