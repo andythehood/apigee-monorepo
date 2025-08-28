@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=../../.schemas/datacollector-schema.json
+#4
+datacollector:
+  name: dc_integer
+  type: INTEGER
+

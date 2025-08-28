@@ -1,0 +1,201 @@
+# This workflow deploys ApigeeX Key Value Maps (KVMs).
+
+name: Deploy ApigeeX KVMs
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'kvms/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'kvms/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    name: Detect Changes to KVMs
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      changed_kvms: ${{ steps.set-kvms.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        run: |
+          echo "Detecting changed files..."
+          echo "Event name: ${{ github.event_name }}"
+
+          # Compare with the base commit (for PRs) or previous SHA (for push)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" ${{ github.sha }} | xargs)
+
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Extract changed KVM folders
+        id: set-kvms
+        run: |
+          FILES="${{ steps.changed.outputs.changed_files }}"
+
+          KVMS=$(echo "$FILES" | tr ' ' '\n' | grep '^kvms/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          echo "$KVMS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  deploy-kvms:
+    name: Deploy Changed KVMs
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed_kvms != '[]'
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
+      APIGEE_X_ENVS: "public private"
+
+    strategy:
+      matrix:
+        kvm: ${{ fromJson(needs.detect-changes.outputs.changed_kvms) }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # The committed changes may have deleted the targetserver folder, so we need to check whether it still exists
+      # If it does, then we proceed with the deployment
+      # If it does not, we delete the KVM from all environments
+      - name: Check if KVM folder exists
+        id: check_folder
+        run: |
+          if [ -d "kvms/${{ matrix.kvm }}" ]; then
+            echo "KVM folder exists"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Folder does not exist"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.APIGEE_SA_KEY }}'
+
+      - name: Install Apigee CLI
+        run: |
+          curl -sLO https://github.com/apigee/apigeecli/releases/download/v2.13.0/apigeecli_v2.13.0_Linux_x86_64.zip
+          unzip apigeecli_v2.13.0_Linux_x86_64.zip
+          sudo mv apigeecli_v2.13.0_Linux_x86_64/apigeecli /usr/local/bin/
+
+      - name: Install yq
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+
+      - name: Output Deployment Info
+        if: steps.check_folder.outputs.exists == 'true'
+        run: |
+          echo "Preparing to deploy KVM ${{ matrix.kvm }} to $APIGEE_X_ORG from branch ${{ github.ref_name }}"
+
+      - name: Render template with environment variable substitution from .env 
+        if: steps.check_folder.outputs.exists == 'true'
+        uses: ./.github/actions/render-envvars
+        with:
+          template: "kvms/${{ matrix.kvm }}/template.yaml"
+          envfile: "kvms/${{ matrix.kvm }}/.env.$DEPLOY_ENV"
+          output: "kvms/${{ matrix.kvm }}/output.yaml"
+
+      - name: Convert output for apigeecli kvms entries import command
+        if: steps.check_folder.outputs.exists == 'true'
+        run: |
+          yq -o json '.keyValueEntries = .kvm.entries | del .kvm' kvms/${{ matrix.kvm }}/output.yaml > kvms/${{ matrix.kvm }}/kvm-entries.json
+          echo "✅ KVM entries written to kvms/${{ matrix.kvm }}/kvm-entries.json"
+
+      - name: Print result
+        if: steps.check_folder.outputs.exists == 'true'
+        run: |
+          cat kvms/${{ matrix.kvm }}/kvm-entries.json
+
+      - name: Create ApigeeX KVM if it doesn't exist
+        if: steps.check_folder.outputs.exists == 'true'
+        run: |
+          set +e  # disable immediate exit on error
+
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
+            echo "Deploying to environment: $APIGEE_X_ENV"
+            OUTPUT=$(apigeecli kvms create --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name ${{ matrix.kvm }} 2>&1) 
+            STATUS=$?
+
+            echo "$OUTPUT"
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Success"
+            elif echo "$OUTPUT" | grep -q "already exists"; then
+              echo "ℹ️ Already exists, treating as success"
+            else
+              echo "❌ Unexpected error"
+              exit $STATUS
+            fi
+          done
+
+      - name: Import entries into KVM
+        if: steps.check_folder.outputs.exists == 'true'
+        run: |
+          set +e  # disable immediate exit on error
+
+          for APIGEE_X_ENV in $APIGEE_X_ENVS; do 
+            echo "Import KVM entries to ${{ matrix.kvm }} in environment: $APIGEE_X_ENV"
+            OUTPUT=$(apigeecli kvms entries import --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --map ${{ matrix.kvm }} --file kvms/${{ matrix.kvm }}/kvm-entries.json 2>&1) 
+            STATUS=$?
+
+            echo "$OUTPUT"
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Successful import KVM entries into ${{ matrix.kvm }} in environment $APIGEE_X_ENV"
+            # elif echo "$OUTPUT" | grep -q "already exists"; then
+            #   echo "ℹ️ Already exists, treating as success"
+            else
+              echo "❌ Unexpected error importing KVM entries into ${{ matrix.kvm }} in environment $APIGEE_X_ENV"
+              exit $STATUS
+            fi
+          done
+
+      # The committed changes have deleted the kvm, so we delete the kvm from all environments          
+      - name: Remove Deleted KVMs
+        if: steps.check_folder.outputs.exists == 'false'
+        run: |
+          set +e  # disable immediate exit on error
+          echo "KVM ${{ matrix.kvm }} does not exist. Undeploying from all Environments."
+          ENVS=$(apigeecli environments list --default-token -o "$APIGEE_X_ORG"  | jq -r '. | join(" ")')
+          for APIGEE_X_ENV in $ENVS; do
+            OUTPUT=$(apigeecli kvms delete --default-token -o "$APIGEE_X_ORG" -e "$APIGEE_X_ENV" --name "${{ matrix.kvm }}")
+            STATUS=$?
+
+            if [ "$STATUS" -eq 0 ]; then
+              echo "✅ Success"
+            elif echo "$OUTPUT" | grep -q "is referenced by deployment"; then
+              echo "ℹ️ KVM is referenced by a proxy deployed to this environment, so ignoring delete"
+            elif echo "$OUTPUT" | grep -q "not found"; then
+              echo "ℹ️ KVM is not deployed to this environment, so ignoring delete"
+            else
+              echo "❌ Unexpected error"
+              exit $STATUS
+            fi
+          done
