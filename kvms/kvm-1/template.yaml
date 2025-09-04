@@ -2,8 +2,4 @@
 #4
 kvm:
   name: kvm-1
-  entries:
-    - name: key1
-      value: ${KEY1}
-    - name: key2
-      value: ${KEY2}
+  entries: []
