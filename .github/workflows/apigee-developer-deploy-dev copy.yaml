@@ -1,6 +1,6 @@
-# This workflow deploys ApigeeX Data Collectors
+# This workflow deploys ApigeeX Developers
 
-name: Deploy ApigeeX Datacollectors
+name: Deploy ApigeeX developers
 
 # Controls when the workflow will run
 on:
@@ -8,22 +8,22 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'datacollectors/**'
+      - 'developers/**'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'datacollectors/**'
+      - 'developers/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   detect-changes:
-    name: Detect Changes to Data Collectors
+    name: Detect Changes to Developers
     runs-on: ubuntu-latest
     environment: dev
     outputs:
-      datacollectors: ${{ steps.set-datacollectors.outputs.matrix }}
+      developers: ${{ steps.set-developers.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -50,20 +50,20 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Extract changed Data Collector folders
-        id: set-datacollectors
+        id: set-developers
         run: |
           FILES="${{ steps.changed.outputs.changed_files }}"
 
-          DATACOLLECTORS=$(echo "$FILES" | tr ' ' '\n' | grep '^datacollectors/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
+          DEVELOPERS=$(echo "$FILES" | tr ' ' '\n' | grep '^developers/' | cut -d/ -f2 | sort -u | jq -R . | jq -s .)
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
-          echo "$DATACOLLECTORS" >> $GITHUB_OUTPUT
+          echo "$DEVELOPERS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          echo ${DATACOLLECTORS} 
+          echo ${DEVELOPERS} 
 
-  deploy-datacollectors:
-    name: Deploy Changed Data Collectors
+  deploy-developers:
+    name: Deploy Changed Developers
     needs: detect-changes
-    if: needs.detect-changes.outputs.datacollectors != '[]'
+    if: needs.detect-changes.outputs.developers != '[]'
 
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
@@ -74,19 +74,19 @@ jobs:
 
     strategy:
       matrix:
-        datacollector: ${{ fromJson(needs.detect-changes.outputs.datacollectors) }}
+        developer: ${{ fromJson(needs.detect-changes.outputs.developers) }}
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # The committed changes may have deleted the Data Collector folder, so we need to check whether it still exists
+      # The committed changes may have deleted the Developer folder, so we need to check whether it still exists
       # If it does, then we proceed with the deployment
-      # If it does not, we delete the Data Collector from the Org
+      # If it does not, we delete the Developer from all environments
       - name: Check if Data Collector folder exists
         id: check_folder
         run: |
-          if [ -d "datacollectors/${{ matrix.datacollector }}" ]; then
+          if [ -d "developers/${{ matrix.developer }}" ]; then
             echo "Data Collector folder exists"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
@@ -114,43 +114,43 @@ jobs:
       - name: Output Deployment Info
         if: steps.check_folder.outputs.exists == 'true'
         run: |
-          echo "Preparing to deploy Data Collector ${{ matrix.datacollector }} to $APIGEE_X_ORG from branch ${{ github.ref_name }}"
+          echo "Preparing to deploy Developer ${{ matrix.developer }} to $APIGEE_X_ORG from branch ${{ github.ref_name }}"
 
-      - name: Create ApigeeX Data Collector if it doesn't exist
+      - name: Create ApigeeX Developer if it doesn't exist
         if: steps.check_folder.outputs.exists == 'true'
         run: |
           set +e  # disable immediate exit on error
 
-          TYPE=$(cat "datacollectors/${{ matrix.datacollector }}/datacollector.yaml" | yq -r '.datacollector.type')
+          TYPE=$(cat "developers/${{ matrix.developer }}/developer.yaml" | yq -r '.developer.type')
 
-          OUTPUT=$(apigeecli datacollectors create --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.datacollector }} --type $TYPE 2>&1) 
+          OUTPUT=$(apigeecli developers create --default-token -o "$APIGEE_X_ORG" --name ${{ matrix.developer }} --type $TYPE 2>&1) 
           STATUS=$?
 
           echo "$OUTPUT"
           if [ "$STATUS" -eq 0 ]; then
-            echo "✅ Successfully created Data Collector ${{ matrix.datacollector }}"
+            echo "✅ Success"
           elif echo "$OUTPUT" | grep -q "already exists"; then
-            echo "ℹ️ Data Collector ${{ matrix.datacollector }} already exists, treating as success"
+            echo "ℹ️ Already exists, treating as success"
           else
-            echo "❌ Unexpected error creating Data Collector ${{ matrix.datacollector }}"
+            echo "❌ Unexpected error"
             exit $STATUS
           fi
 
-      # The committed changes have deleted the datacollector, so we delete the datacollector from the Org          
-      - name: Remove Deleted Data Collectors
+      # The committed changes have deleted the developer, so we delete the developer from the Org          
+      - name: Remove Deleted Developers
         if: steps.check_folder.outputs.exists == 'false'
         run: |
           set +e  # disable immediate exit on error
-          echo "Data Collector ${{ matrix.datacollector }} does not exist. Undeploying from the Org."
+          echo "Developer ${{ matrix.developer }} does not exist. Undeploying from the Org."
 
-          OUTPUT=$(apigeecli datacollectors delete --default-token -o "$APIGEE_X_ORG"  --name "${{ matrix.datacollector }}")
+          OUTPUT=$(apigeecli developers delete --default-token -o "$APIGEE_X_ORG"  --name "${{ matrix.developer }}")
           STATUS=$?
 
           if [ "$STATUS" -eq 0 ]; then
             echo "✅ Success"
           elif echo "$OUTPUT" | grep -q "not found"; then
-            echo "ℹ️ Datacollector ${{ matrix.datacollector }} is not deployed to this org, so ignoring delete"
+            echo "ℹ️ Developer ${{ matrix.developer }} is not deployed to this org, so ignoring delete"
           else
-            echo "❌ Unexpected error deleting Data Collector ${{ matrix.datacollector }}"
+            echo "❌ Unexpected error"
             exit $STATUS
           fi

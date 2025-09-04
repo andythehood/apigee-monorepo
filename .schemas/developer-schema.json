@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Developer",
+  "type": "object",
+  "properties": {
+    "developer": {
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "userName": { "type": "string" },
+        "status": { "type": ["string", "null"] },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": ["string", "null"] }
+            },
+            "required": ["name"]
+          }
+        }
+      },
+      "required": ["email", "firstName", "lastName", "userName"]
+    }
+  },
+  "required": [ "developer"],
+  "additionalProperties": false
+}
