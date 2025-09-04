@@ -70,7 +70,7 @@ jobs:
     env:
       DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
       APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-      APIGEE_X_ENVS: "public private"
+      APIGEE_X_ENVS: "public eval"
 
     strategy:
       matrix:

@@ -69,7 +69,7 @@ jobs:
     environment: dev
     env:
       APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-      APIGEE_X_ENVS: "public private"
+      APIGEE_X_ENVS: "public eval"
       DEPLOY_ENV: dev
 
     strategy:

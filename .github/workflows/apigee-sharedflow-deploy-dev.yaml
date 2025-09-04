@@ -71,7 +71,7 @@ jobs:
     environment: dev
     env:
       APIGEE_X_ORG: ${{ vars.APIGEE_X_ORG }}
-      APIGEE_X_ENVS: "public private"
+      APIGEE_X_ENVS: "public eval"
     strategy:
       matrix:
         sharedflow: ${{ fromJson(needs.detect-changes.outputs.changed_sharedflows) }}
